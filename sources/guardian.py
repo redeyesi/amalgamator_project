@@ -33,7 +33,7 @@ def fetch(api_key: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     logger.debug(f"Requesting Guardian API with params: {params or DEFAULT_PARAMS}")
 
     try:
-        response = requests.get(API_URL, params=request_params)
+        response = requests.get(API_URL, params=request_params, timeout=10)
         response.raise_for_status()
         data = response.json()
         raw_articles = data.get("response", {}).get("results", [])

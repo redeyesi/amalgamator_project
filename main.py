@@ -34,9 +34,6 @@ def setup_logging(log_dir: str = "logs") -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-logger = setup_logging()
-
-
 # --- Main Orchestrator ---
 
 
@@ -45,6 +42,7 @@ def main():
     Main entry point. Fetches articles from all sources, deduplicates,
     saves to CSV, and sends an email notification.
     """
+    logger = setup_logging()
     load_dotenv()
 
     CSV_FILE = "articles.csv"
@@ -81,11 +79,6 @@ def main():
             "feed_url": "https://feeds.npr.org/1001/rss.xml",
             "source_name": "NPR",
             "section": "News",
-        },
-        {
-            "feed_url": "https://www.theguardian.com/world/rss",
-            "source_name": "The Guardian",
-            "section": "World",
         },
         {
             "feed_url": "https://rsshub.app/apnews/topics/apf-topnews",

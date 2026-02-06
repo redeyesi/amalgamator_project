@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Any, Optional
 
@@ -42,7 +42,9 @@ def fetch(
     logger.debug(f"Fetching RSS feed: {feed_url}")
 
     try:
-        feed = feedparser.parse(feed_url)
+        feed = feedparser.parse(
+            feed_url, request_headers={"User-Agent": "Amalgamator/1.0"}
+        )
     except Exception as e:
         logger.error(f"RSS fetch failed for {feed_url}: {e}")
         return []
