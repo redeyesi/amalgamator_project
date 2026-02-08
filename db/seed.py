@@ -1,13 +1,13 @@
 """
-Seeds the sources table with all available news feeds.
+Seeds the database with news sources and the default user.
 Run once:  python -m db.seed
-Re-run is safe — skips URLs that already exist.
+Re-run is safe — skips records that already exist.
 """
 
 import logging
 
 from db import engine, get_session
-from db.models import Base, Source
+from db.models import Base, LookupTier, Source, User, UserSubscription, UserTierChange
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -61,7 +61,7 @@ SEED_SOURCES = [
 
 
 def seed():
-    """Creates the tables and inserts seed data (skips existing URLs)."""
+    """Creates the tables and inserts seed data (skips existing records)."""
     Base.metadata.create_all(engine)
     session = get_session()
 
@@ -69,6 +69,7 @@ def seed():
     skipped = 0
 
     try:
+        # --- Seed news sources ---
         existing_urls = {row.url for row in session.query(Source.url).all()}
 
         for data in SEED_SOURCES:
@@ -79,7 +80,64 @@ def seed():
             added += 1
 
         session.commit()
-        logger.info(f"Seed complete: {added} added, {skipped} already existed.")
+        logger.info(f"Sources: {added} added, {skipped} already existed.")
+
+        # --- Seed lookup tiers ---
+        existing_tier_ids = {row.id for row in session.query(LookupTier.id).all()}
+        tier_added = 0
+        for tier_data in [
+            {"id": 1, "tier_name": "free"},
+            {"id": 2, "tier_name": "subscription"},
+        ]:
+            if tier_data["id"] not in existing_tier_ids:
+                session.add(LookupTier(**tier_data))
+                tier_added += 1
+        session.commit()
+        logger.info(f"Tiers: {tier_added} added, {2 - tier_added} already existed.")
+
+        # --- Seed default user ---
+        default_email = "simongreen1@gmail.com"
+        user = session.query(User).filter(User.email == default_email).first()
+        if not user:
+            user = User(
+                email=default_email,
+                first_name="Simon",
+                last_name="Green",
+                timezone="Europe/Berlin",
+                delivery_schedule="daily",
+                tier=1,
+                active=True,
+            )
+            session.add(user)
+            session.commit()
+            # Record initial tier assignment
+            session.add(UserTierChange(user_id=user.id, prev_tier=None, new_tier=1))
+            session.commit()
+            logger.info(f"Created default user: {user.email}")
+        else:
+            logger.info(f"Default user already exists: {user.email}")
+
+        # --- Subscribe default user to all active sources ---
+        active_sources = session.query(Source).filter(Source.active == True).all()
+        existing_subs = {
+            row.source_id
+            for row in session.query(UserSubscription.source_id)
+            .filter(UserSubscription.user_id == user.id)
+            .all()
+        }
+
+        sub_added = 0
+        for source in active_sources:
+            if source.id not in existing_subs:
+                session.add(UserSubscription(user_id=user.id, source_id=source.id))
+                sub_added += 1
+
+        session.commit()
+        logger.info(
+            f"Subscriptions: {sub_added} added, "
+            f"{len(active_sources) - sub_added} already existed."
+        )
+
     except Exception as e:
         session.rollback()
         logger.error(f"Seed failed: {e}")

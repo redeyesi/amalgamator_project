@@ -103,36 +103,44 @@ def _bucket_articles(articles: List[Dict[str, Any]], now: datetime) -> List[tupl
     return [(heading, items) for heading, items in buckets.items() if items]
 
 
-def send_email(
-    new_articles: List[Dict[str, Any]], sender: str, recipients: List[str]
+def send_email_for_user(
+    articles: List[Dict[str, Any]],
+    sender: str,
+    recipient: str,
+    user_name: str = "",
+    user_timezone: str = "Europe/Berlin",
 ) -> None:
     """
-    Sends an HTML email notification with the list of new articles using Gmail API.
+    Sends an HTML email to a single user with their pending articles.
+    Uses the user's preferred timezone for date formatting.
     Articles are grouped into time-based sections: last hour, last 6 hours, last 24 hours.
     """
-    if not new_articles:
+    if not articles:
         return
 
     service = _get_gmail_service()
 
-    subject = f"New Articles Detected ({len(new_articles)})"
-    cet = ZoneInfo("Europe/Berlin")
+    subject = f"New Articles for {user_name} ({len(articles)})"
+    tz = ZoneInfo(user_timezone)
     now = datetime.now(timezone.utc)
 
-    sections = _bucket_articles(new_articles, now)
+    sections = _bucket_articles(articles, now)
 
     html_sections = []
-    for heading, articles in sections:
-        cards = "".join(_render_article_card(a, cet) for a in articles)
+    for heading, section_articles in sections:
+        cards = "".join(_render_article_card(a, tz) for a in section_articles)
         html_sections.append(
             f'<h2 style="color: #005689; border-bottom: 2px solid #005689; padding-bottom: 6px; margin-top: 30px;">'
-            f"{heading} ({len(articles)})</h2>"
+            f"{heading} ({len(section_articles)})</h2>"
             f"{cards}"
         )
 
+    greeting = f"Hi {user_name}," if user_name else "Hi,"
+
     html_body = (
         f'<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">'
-        f'<h1 style="color: #005689;">New Articles ({len(new_articles)})</h1>'
+        f'<p style="color: #333;">{greeting}</p>'
+        f'<h1 style="color: #005689;">Your New Articles ({len(articles)})</h1>'
         f'{"".join(html_sections)}'
         f"</body></html>"
     )
@@ -142,14 +150,14 @@ def send_email(
         "New articles detected. View this email in an HTML-capable client."
     )
     message.add_alternative(html_body, subtype="html")
-    message["To"] = ", ".join(recipients)
+    message["To"] = recipient
     message["From"] = sender
     message["Subject"] = subject
 
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     create_message = {"raw": encoded_message}
 
-    logger.info(f"Sending Gmail API email to {', '.join(recipients)}...")
+    logger.info(f"Sending Gmail API email to {recipient}...")
     try:
         send_result = (
             service.users().messages().send(userId="me", body=create_message).execute()
