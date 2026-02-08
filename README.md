@@ -78,6 +78,7 @@ python main.py
 ```
 
 The script will:
+
 1. Fetch articles from the Guardian API and all configured RSS feeds
 2. Deduplicate against previously seen articles in `articles.csv`
 3. Append new articles to the CSV
@@ -99,10 +100,10 @@ Add an entry to the `rss_feeds` list in `main.py`:
 
 All sources normalise articles to this dict structure:
 
-| Key | Description |
-|---|---|
-| `source` | Provider name (e.g. "BBC News") |
-| `headline` | Article title |
-| `sectionName` | Section/category label |
-| `lastModified` | ISO 8601 UTC timestamp |
-| `webUrl` | Link to the full article |
+| Key            | Description                     |
+| -------------- | ------------------------------- |
+| `source`       | Provider name (e.g. "BBC News") |
+| `headline`     | Article title                   |
+| `sectionName`  | Section/category label          |
+| `lastModified` | ISO 8601 UTC timestamp          |
+| `webUrl`       | Link to the full article        |

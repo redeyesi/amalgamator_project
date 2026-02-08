@@ -8,6 +8,8 @@ from sources import guardian, rss
 from utils.dedup import deduplicate
 from utils.storage import load_existing_hashes, save_articles
 from utils.email_service import send_email
+from db import get_session
+from db.models import Source
 
 
 # --- Configuration & Logging Setup ---
@@ -49,46 +51,33 @@ def main():
     EMAIL_SENDER = "datacollectionstorage@gmail.com"
     EMAIL_RECIPIENTS = ["simongreen1@gmail.com"]
 
-    # --- Fetch from all sources ---
+    # --- Fetch from all active sources ---
     all_articles = []
+    session = get_session()
 
-    # Guardian
-    guardian_key = os.getenv("GUARDIAN_API_KEY")
-    if guardian_key:
-        all_articles.extend(guardian.fetch(guardian_key))
-    else:
-        logger.warning("GUARDIAN_API_KEY not set. Skipping Guardian.")
+    try:
+        active_sources = session.query(Source).filter(Source.active == True).all()
+        logger.info(f"Loaded {len(active_sources)} active sources from database.")
 
-    # --- RSS Feeds ---
-    rss_feeds = [
-        {
-            "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
-            "source_name": "BBC News",
-            "section": "World",
-        },
-        {
-            "feed_url": "https://feeds.bbci.co.uk/news/uk/rss.xml",
-            "source_name": "BBC News",
-            "section": "UK",
-        },
-        {
-            "feed_url": "https://www.aljazeera.com/xml/rss/all.xml",
-            "source_name": "Al Jazeera",
-        },
-        {
-            "feed_url": "https://feeds.npr.org/1001/rss.xml",
-            "source_name": "NPR",
-            "section": "News",
-        },
-        {
-            "feed_url": "https://rsshub.app/apnews/topics/apf-topnews",
-            "source_name": "Associated Press",
-            "section": "Top News",
-        },
-    ]
+        for source in active_sources:
+            if source.source_type == "api" and "guardianapis" in source.url:
+                guardian_key = os.getenv("GUARDIAN_API_KEY")
+                if guardian_key:
+                    all_articles.extend(guardian.fetch(guardian_key))
+                else:
+                    logger.warning("GUARDIAN_API_KEY not set. Skipping Guardian.")
 
-    for feed in rss_feeds:
-        all_articles.extend(rss.fetch(**feed, max_items=5))
+            elif source.source_type == "rss":
+                all_articles.extend(
+                    rss.fetch(
+                        feed_url=source.url,
+                        source_name=source.source_name,
+                        section=source.section,
+                        max_items=5,
+                    )
+                )
+    finally:
+        session.close()
 
     if not all_articles:
         logger.info("No articles returned from any source. Exiting.")

@@ -12,6 +12,7 @@ sg_testing_key.json
 
 # Data & logs
 articles.csv
+*.db
 logs/
 *.bak
 
